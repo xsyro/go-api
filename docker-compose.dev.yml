@@ -1,0 +1,49 @@
+version: "3.8"
+
+networks:
+  goapi:
+    driver: bridge
+
+services:
+  goapi:
+    build:
+      context: .
+      dockerfile: ./deployments/docker/Dockerfile.dev
+    env_file:
+      - ./deployments/docker/.env
+    command: /entrypoint.dev.sh
+    depends_on:
+      - db
+      - jaeger
+    ports:
+      - "8080:8080"
+    restart: on-failure
+    networks:
+      - goapi
+  db:
+    image: postgres:15-alpine
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: go_sass
+    ports:
+      - "5432:5432"
+    networks:
+      - goapi
+  redis:
+    image: redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    networks:
+      - goapi
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    ports:
+      - "4318:4318"
+      - "16686:16686"
+    networks:
+      - goapi
+    logging:
+      driver: json-file

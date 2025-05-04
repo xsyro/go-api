@@ -1,0 +1,32 @@
+# argument for Go version
+ARG GO_VERSION=1.22
+
+# STAGE 1: building the executable
+FROM golang:${GO_VERSION}-alpine AS build
+
+RUN apk add --no-cache git
+WORKDIR /src
+COPY . .
+
+# Make the entrypoint script executable
+RUN chmod +x ./deployments/bin/entrypoint.dev.sh
+
+# Build the executables
+RUN CGO_ENABLED=0 go build \
+    -installsuffix 'base' \
+    -o /out/app ./cmd/app/main.go
+
+RUN CGO_ENABLED=0 go build \
+    -installsuffix 'base' \
+    -o /out/migrate ./internal/db/migrate.go
+
+# STAGE 2: build the container to run
+FROM alpine:latest AS final
+
+USER nobody
+# copy compiled app
+COPY --from=build --chown=nobody /out/app /app
+COPY --from=build --chown=nobody /out/migrate /migrate
+COPY --from=build --chown=nobody /src/deployments/bin/entrypoint.dev.sh /entrypoint.dev.sh
+
+EXPOSE 8080
